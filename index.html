@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>하와이 여행경비 계산기</title>
+<style>
+:root{--bg:#f2f6f8;--card:#fff;--tx:#0e3b4c;--sub:#5a7381;--line:#d3dfe5;--in:#f7fafb;--ok:#2e9e6b;--warn:#e07b00;--bad:#d6455d;--acc:#1f6f8b;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1a20;--card:#172830;--tx:#e6f0f4;--sub:#93abb7;--line:#2a3f4a;--in:#10202a;--acc:#5fb4d0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Pretendard","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;line-height:1.45;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+main{max-width:640px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:21px;margin:4px 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.total{background:var(--acc);color:#fff;border:0}
+.lbl{font-size:12.5px;color:var(--sub)}
+.total .lbl{color:#d5eaf1}
+.big{font-size:28px;font-weight:700}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;font-size:13px}
+.g3 b{display:block;font-size:15px}
+.rate{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+input{font:inherit;color:var(--tx);background:var(--in);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
+input:focus{outline:2px solid var(--acc);outline-offset:1px}
+.rate input{width:90px;background:#fff;color:#0e3b4c}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}
+.total .bar{background:rgba(255,255,255,.3)}
+.bar i{display:block;height:100%;width:0;background:var(--ok);border-radius:99px;transition:width .25s}
+.total .bar i{background:#fff}
+.bar i.warn{background:var(--warn)}.bar i.bad{background:var(--bad)}
+.tiles{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;gap:10px;overflow-x:auto;padding:6px 0 10px;margin-bottom:6px;scrollbar-width:none}
+.tiles::-webkit-scrollbar{display:none}
+.tile{flex:0 0 auto;width:68px;text-align:center;background:none;border:0;padding:0;color:var(--tx);font:inherit;cursor:pointer}
+.tile .ic{display:flex;align-items:center;justify-content:center;height:60px;border-radius:18px;background:var(--card);border:1px solid var(--line);font-size:27px}
+.tile span{display:block;font-size:12.5px;margin-top:5px}
+.tile small{display:block;font-size:11px;color:var(--sub)}
+.tile.on .ic{border:2px solid var(--acc);background:var(--in)}
+.tile.on span{font-weight:700}
+.ch{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ch h2{font-size:18px;margin:0}
+.pct{font-weight:700}
+.row{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.rn{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.in2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.in2 label{font-size:12px;color:var(--sub)}
+.rk{font-size:12px;color:var(--sub);margin-top:5px}
+.over{color:var(--bad)}
+button.b{font:inherit;font-size:13px;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
+button.b.acc{background:var(--acc);color:#fff;border-color:var(--acc)}
+button.b.del{color:var(--bad);white-space:nowrap;padding:6px 10px}
+.bar2{display:flex;gap:8px;margin-top:12px}
+.sumrow{cursor:pointer}
+.sumrow .meta{font-size:12.5px;color:var(--sub);margin-top:2px}
+.foot{margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<main>
+<h1>🌺 하와이 여행경비</h1>
+<section class="card total">
+  <div class="lbl">전체 사용액 (10/29 ~ 11/7 · 3인)</div>
+  <div class="big" id="tS">$0</div><div class="lbl" id="tSk"></div>
+  <div class="bar"><i id="tB"></i></div>
+  <div class="g3">
+    <div><span class="lbl">목표</span><b id="tT"></b><span class="lbl" id="tTk"></span></div>
+    <div><span class="lbl">남은 금액</span><b id="tR"></b><span class="lbl" id="tRk"></span></div>
+    <div><span class="lbl">사용률</span><b id="tP"></b></div>
+  </div>
+  <div class="rate">환율 $1 = <input id="rate" type="number" inputmode="decimal" min="0"> 원</div>
+</section>
+<nav class="tiles" id="tiles"></nav>
+<div id="view"></div>
+<div class="foot"><button class="b" data-act="reset" id="reset">기본값으로 되돌리기</button></div>
+</main>
+
+<script>
+const DEF=[
+ ['air','항공권','✈️',[['대한항공 왕복 (3인)',2419]]],
+ ['stay','숙박비','🏨',[['힐튼 하와이안 빌리지',1100],['콘도·에어비앤비',900],['리조트피·청소비·세금 등',143]]],
+ ['trans','교통비','🚗',[['렌트비 (5일)',300],['주유비',70],['보험료',80],['주차·우버·기타',50]]],
+ ['food','식비','🍽️',[['식당',700],['마트쇼핑',371]]],
+ ['fun','레저','🏄',[['서핑 레슨',150],['쿠알로아 랜치',200],['폴리네시안 문화센터',180],['다이아몬드헤드·하나우마·진주만',60],['아쿠아리움·동물원',30],['핼러윈·파티',23]]],
+ ['shop','쇼핑','🎁',[['기념품',167],['선물',200]]]
+];
+const mk=()=>DEF.map(c=>({id:c[0],n:c[1],e:c[2],items:c[3].map((it,i)=>({id:c[0]+i,n:it[0],t:it[1],s:''}))}));
+const KEY='hawaii-budget-v2';
+let S={rate:1400,cats:mk()},view='sum',edit=false,arm=null;
+try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&r.cats)S=r}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+const num=v=>parseFloat(v)||0;
+const usd=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString('en-US');
+const krw=n=>Math.round(n*S.rate).toLocaleString('ko-KR')+'원';
+const tot=c=>c.items.reduce((a,i)=>(a.t+=num(i.t),a.s+=num(i.s),a),{t:0,s:0});
+const pc=(s,t)=>t>0?s/t*100:0;
+const cls=p=>p>100?'bad':p>80?'warn':'';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+function bar(el,p){if(!el)return;el.style.width=Math.min(100,p)+'%';el.className=cls(p)}
+function setT(id,t,bad){const e=$(id);if(e){e.textContent=t;if(bad!=null)e.style.color=bad?'var(--bad)':''}}
+
+function render(){
+  $('tiles').innerHTML=[['sum','📊','요약']].concat(S.cats.map(c=>[c.id,c.e,c.n])).map(t=>
+    `<button class="tile${view===t[0]?' on':''}" data-act="view" data-v="${t[0]}"><div class="ic">${t[1]}</div><span>${t[2]}</span><small id="tp_${t[0]}"></small></button>`).join('');
+  const v=$('view');
+  if(view==='sum'){
+    v.innerHTML=S.cats.map(c=>`<div class="card sumrow" data-act="view" data-v="${c.id}">
+      <div class="ch"><h2>${c.e} ${c.n}</h2><span class="pct" id="sp_${c.id}"></span></div>
+      <div class="meta" id="sm_${c.id}"></div><div class="bar"><i id="sb_${c.id}"></i></div></div>`).join('');
+  }else{
+    const c=S.cats.find(x=>x.id===view);
+    v.innerHTML=`<div class="card"><div class="ch"><h2>${c.e} ${c.n}</h2><span class="pct" id="cp"></span></div>
+      <div class="lbl" id="cm"></div><div class="bar"><i id="cb"></i></div>
+      ${c.items.map(i=>`<div class="row">
+        <div class="rn">${edit?`<input value="${esc(i.n)}" data-i="${i.id}" data-f="n" aria-label="항목명">
+          <button class="b del" data-act="del" data-i="${i.id}">${arm===i.id?'한 번 더 누르면 삭제':'삭제'}</button>`
+          :`<span>${esc(i.n)}</span><span id="p_${i.id}"></span>`}</div>
+        <div class="in2">
+          <div><label for="t_${i.id}">목표 ($)</label><input id="t_${i.id}" type="number" inputmode="decimal" min="0" value="${i.t}" data-i="${i.id}" data-f="t"></div>
+          <div><label for="s_${i.id}">사용 ($)</label><input id="s_${i.id}" type="number" inputmode="decimal" min="0" placeholder="0" value="${i.s}" data-i="${i.id}" data-f="s"></div>
+        </div>
+        <div class="rk" id="k_${i.id}"></div><div class="bar"><i id="b_${i.id}"></i></div></div>`).join('')}
+      <div class="bar2"><button class="b acc" data-act="add">+ 항목 추가</button>
+        <button class="b" data-act="edit">${edit?'편집 완료':'항목명 편집·삭제'}</button></div></div>`;
+  }
+  upd();
+}
+
+function upd(){
+  S.rate=num($('rate').value);
+  let TT=0,TS=0;
+  S.cats.forEach(c=>{
+    const {t,s}=tot(c),p=pc(s,t);TT+=t;TS+=s;
+    setT('tp_'+c.id,Math.round(p)+'%');
+    setT('sp_'+c.id,Math.round(p)+'%',p>100);
+    setT('sm_'+c.id,`${usd(s)} (${krw(s)}) / 목표 ${usd(t)}`);
+    bar($('sb_'+c.id),p);
+    if(view===c.id){
+      setT('cp',Math.round(p)+'%',p>100);
+      setT('cm',`사용 ${usd(s)} (${krw(s)}) / 목표 ${usd(t)} (${krw(t)})`);
+      bar($('cb'),p);
+      c.items.forEach(i=>{
+        const it=num(i.t),is=num(i.s),ip=pc(is,it);
+        setT('p_'+i.id,Math.round(ip)+'%',ip>100);
+        const k=$('k_'+i.id);
+        if(k)k.innerHTML=`목표 ${krw(it)} · 사용 ${krw(is)}`+(it>0&&is>it?` · <span class="over">${usd(is-it)} 초과</span>`:'');
+        bar($('b_'+i.id),ip);
+      });
+    }
+  });
+  const P=pc(TS,TT);
+  setT('tS',usd(TS));setT('tSk',krw(TS));setT('tT',usd(TT));setT('tTk',krw(TT));
+  setT('tR',usd(TT-TS));setT('tRk',krw(TT-TS));setT('tP',Math.round(P)+'%');
+  bar($('tB'),P);$('tB').className='';
+  setT('tp_sum',Math.round(P)+'%');
+}
+
+const find=id=>{for(const c of S.cats){const i=c.items.find(x=>x.id===id);if(i)return [c,i]}return []};
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(el.id==='rate'){upd();save();return}
+  if(el.dataset.i){const [,i]=find(el.dataset.i);if(i){i[el.dataset.f]=el.value;upd();save()}}
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='view'){view=b.dataset.v;edit=false;arm=null;render();window.scrollTo({top:0})}
+  else if(a==='edit'){edit=!edit;arm=null;render()}
+  else if(a==='add'){
+    const c=S.cats.find(x=>x.id===view),id='x'+Date.now();
+    c.items.push({id,n:'새 항목',t:0,s:''});edit=true;render();save();
+    const inp=document.querySelector(`input[data-i="${id}"][data-f="n"]`);if(inp){inp.focus();inp.select()}
+  }
+  else if(a==='del'){
+    const id=b.dataset.i;
+    if(arm===id){const c=S.cats.find(x=>x.id===view);c.items=c.items.filter(x=>x.id!==id);arm=null;render();save()}
+    else{arm=id;render();setTimeout(()=>{if(arm===id){arm=null;render()}},3000)}
+  }
+  else if(a==='reset'){
+    if(arm==='reset'){S.cats=mk();arm=null;edit=false;$('reset').textContent='기본값으로 되돌리기';render();save()}
+    else{arm='reset';b.textContent='한 번 더 누르면 모든 데이터 초기화';setTimeout(()=>{if(arm==='reset'){arm=null;b.textContent='기본값으로 되돌리기'}},3000)}
+  }
+});
+$('rate').value=S.rate;
+render();
+</script>
+</body>
+</html>
