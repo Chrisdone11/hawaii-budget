@@ -19,8 +19,8 @@ h1{font-size:21px;margin:4px 0 12px}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;font-size:13px}
 .g3 b{display:block;font-size:15px}
 .rate{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
-input{font:inherit;color:var(--tx);background:var(--in);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
-input:focus{outline:2px solid var(--acc);outline-offset:1px}
+input,select{font:inherit;color:var(--tx);background:var(--in);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:100%;min-width:0}
+input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px}
 .rate input{width:90px;background:#fff;color:#0e3b4c}
 .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}
 .total .bar{background:rgba(255,255,255,.3)}
@@ -40,16 +40,29 @@ input:focus{outline:2px solid var(--acc);outline-offset:1px}
 .pct{font-weight:700}
 .row{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
 .rn{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;font-weight:600}
-.in2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-.in2 label{font-size:12px;color:var(--sub)}
-.rk{font-size:12px;color:var(--sub);margin-top:5px}
+.in2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;align-items:end}
+.in2 label{font-size:12px;color:var(--sub);display:block}
+.used{font-weight:700;font-size:14px;padding:8px 0}
+.rk{font-size:12px;color:var(--sub);margin-top:2px}
 .over{color:var(--bad)}
 button.b{font:inherit;font-size:13px;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
 button.b.acc{background:var(--acc);color:#fff;border-color:var(--acc)}
 button.b.del{color:var(--bad);white-space:nowrap;padding:6px 10px}
-.bar2{display:flex;gap:8px;margin-top:12px}
+button.ic2{font:inherit;background:none;border:0;padding:4px 6px;cursor:pointer;color:var(--tx)}
+.bar2,.acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.fm{display:grid;grid-template-columns:auto 1fr;gap:8px;margin-top:10px;align-items:center}
+.fm .full{grid-column:1/-1}
+.seg{display:flex;gap:4px}
+.seg .b{padding:8px 14px}
+.en{display:grid;grid-template-columns:38px 1fr auto auto auto;gap:4px;align-items:center;padding:7px 0;border-top:1px dashed var(--line);font-size:13px}
+.en.ed{grid-template-columns:1fr 1fr auto auto}
+.ed0{color:var(--sub);font-size:12px}
+.en small{color:var(--sub)}
+.empty{font-size:12.5px;color:var(--sub);padding:8px 0}
 .sumrow{cursor:pointer}
 .sumrow .meta{font-size:12.5px;color:var(--sub);margin-top:2px}
+.qs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 0}
+.msg{font-size:12.5px;color:var(--ok);margin-top:8px;min-height:18px}
 .foot{margin-top:18px;text-align:center}
 </style>
 </head>
@@ -81,49 +94,85 @@ const DEF=[
  ['fun','레저','🏄',[['서핑 레슨',150],['쿠알로아 랜치',200],['폴리네시안 문화센터',180],['다이아몬드헤드·하나우마·진주만',60],['아쿠아리움·동물원',30],['핼러윈·파티',23]]],
  ['shop','쇼핑','🎁',[['기념품',167],['선물',200]]]
 ];
-const mk=()=>DEF.map(c=>({id:c[0],n:c[1],e:c[2],items:c[3].map((it,i)=>({id:c[0]+i,n:it[0],t:it[1],s:''}))}));
-const KEY='hawaii-budget-v2';
-let S={rate:1400,cats:mk()},view='sum',edit=false,arm=null;
-try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&r.cats)S=r}catch(e){}
+const mk=()=>DEF.map(c=>({id:c[0],n:c[1],e:c[2],items:c[3].map((it,i)=>({id:c[0]+i,n:it[0],t:it[1],en:[]}))}));
+const KEY='hawaii-budget-v3';
+function load(){
+  try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&r.cats)return r}catch(e){}
+  try{const o=JSON.parse(localStorage.getItem('hawaii-budget-v2'));if(o&&o.cats){
+    o.cats.forEach(c=>c.items.forEach(i=>{const s=parseFloat(i.s)||0;i.en=s>0?[{id:'m'+i.id,a:s,w:null,m:'기존 입력',d:''}]:[];delete i.s}));
+    o.cur='$';return o}}catch(e){}
+  return {rate:1400,cur:'$',cats:mk()};
+}
+let S=load(),view='sum',edit=false,arm=null,formId=null,editEn=null,lst=new Set(),q={c:null,i:null};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const $=id=>document.getElementById(id);
 const num=v=>parseFloat(v)||0;
+const r2=n=>Math.round(n*100)/100;
 const usd=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString('en-US');
+const fe=n=>'$'+r2(n).toLocaleString('en-US');
 const krw=n=>Math.round(n*S.rate).toLocaleString('ko-KR')+'원';
-const tot=c=>c.items.reduce((a,i)=>(a.t+=num(i.t),a.s+=num(i.s),a),{t:0,s:0});
+const used=i=>i.en.reduce((a,x)=>a+x.a,0);
+const tot=c=>c.items.reduce((a,i)=>(a.t+=num(i.t),a.s+=used(i),a),{t:0,s:0});
 const pc=(s,t)=>t>0?s/t*100:0;
 const cls=p=>p>100?'bad':p>80?'warn':'';
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const td=()=>{const d=new Date();return (d.getMonth()+1)+'/'+d.getDate()};
+const find=id=>{for(const c of S.cats){const i=c.items.find(x=>x.id===id);if(i)return [c,i]}return []};
 function bar(el,p){if(!el)return;el.style.width=Math.min(100,p)+'%';el.className=cls(p)}
 function setT(id,t,bad){const e=$(id);if(e){e.textContent=t;if(bad!=null)e.style.color=bad?'var(--bad)':''}}
+function ent(v,m){const rt=S.rate||1400;return {id:'e'+Date.now()+Math.random().toString(36).slice(2,5),a:S.cur==='$'?r2(v):r2(v/rt),w:S.cur==='₩'?Math.round(v):null,m:(m||'').trim(),d:td()}}
+const segHTML=()=>`<div class="seg"><button class="b${S.cur==='$'?' acc':''}" data-act="cur" data-c="$">$</button><button class="b${S.cur==='₩'?' acc':''}" data-act="cur" data-c="₩">원</button></div>`;
 
+function formHTML(id){return `<div class="fm">${segHTML()}
+  <input id="fa" type="number" inputmode="decimal" min="0" placeholder="금액" data-sub="addEn" data-i="${id}">
+  <input id="fm" class="full" placeholder="메모 (선택)" data-sub="addEn" data-i="${id}">
+  <button class="b acc full" data-act="addEn" data-i="${id}">추가</button></div><div class="rk" id="fh"></div>`}
+function listHTML(i){
+  if(!i.en.length)return '<div class="empty">아직 내역이 없어요</div>';
+  return i.en.slice().reverse().map(x=>editEn===x.id
+   ?`<div class="en ed"><input id="ea" type="number" inputmode="decimal" value="${x.a}"><input id="em" value="${esc(x.m||'')}" placeholder="메모"><button class="b acc" data-act="saveEn" data-e="${x.id}" data-i="${i.id}">저장</button><button class="b" data-act="cancelEn">취소</button></div>`
+   :`<div class="en"><span class="ed0">${x.d||''}</span><span>${esc(x.m||'')}${x.w?` <small>₩${x.w.toLocaleString('ko-KR')}</small>`:''}</span><b>${fe(x.a)}</b>
+     <button class="ic2" data-act="editEn" data-e="${x.id}" aria-label="수정">✏️</button>
+     <button class="ic2" data-act="delEn" data-e="${x.id}" data-i="${i.id}" aria-label="삭제">${arm===x.id?'삭제?':'🗑'}</button></div>`).join('');
+}
+function itemHTML(i){
+  const fo=formId===i.id,lo=fo||lst.has(i.id);
+  return `<div class="row"><div class="rn">${edit
+    ?`<input value="${esc(i.n)}" data-i="${i.id}" data-f="n" aria-label="항목명"><button class="b del" data-act="del" data-i="${i.id}">${arm===i.id?'한 번 더 누르면 삭제':'삭제'}</button>`
+    :`<span>${esc(i.n)}</span><span id="p_${i.id}"></span>`}</div>
+   <div class="in2"><div><label for="t_${i.id}">목표 ($)</label><input id="t_${i.id}" type="number" inputmode="decimal" min="0" value="${i.t}" data-i="${i.id}" data-f="t"></div>
+   <div><label>사용 (자동 합계)</label><div class="used" id="u_${i.id}"></div></div></div>
+   <div class="rk" id="k_${i.id}"></div><div class="bar"><i id="b_${i.id}"></i></div>
+   ${edit?'':`<div class="acts"><button class="b acc" data-act="form" data-i="${i.id}">+ 지출 추가</button><button class="b" data-act="list" data-i="${i.id}">내역 ${i.en.length}건 ${lo?'▴':'▾'}</button></div>${fo?formHTML(i.id):''}${lo?listHTML(i):''}`}</div>`;
+}
+function quickHTML(){
+  if(!q.c||!S.cats.find(c=>c.id===q.c))q.c=S.cats[0].id;
+  const c=S.cats.find(x=>x.id===q.c);
+  if(!c.items.find(x=>x.id===q.i))q.i=c.items[0]?c.items[0].id:null;
+  return `<div class="card"><div class="ch"><h2>⚡ 빠른 지출 입력</h2></div>
+   <div class="qs"><select id="qc" aria-label="분류">${S.cats.map(x=>`<option value="${x.id}"${x.id===q.c?' selected':''}>${x.e} ${x.n}</option>`).join('')}</select>
+   <select id="qi" aria-label="항목">${c.items.map(x=>`<option value="${x.id}"${x.id===q.i?' selected':''}>${esc(x.n)}</option>`).join('')}</select></div>
+   <div class="fm">${segHTML()}<input id="qa" type="number" inputmode="decimal" min="0" placeholder="금액" data-sub="qadd">
+   <input id="qm" class="full" placeholder="메모 (선택)" data-sub="qadd"><button class="b acc full" data-act="qadd">추가</button></div>
+   <div class="rk" id="qh"></div><div class="msg" id="qmsg"></div></div>`;
+}
 function render(){
   $('tiles').innerHTML=[['sum','📊','요약']].concat(S.cats.map(c=>[c.id,c.e,c.n])).map(t=>
     `<button class="tile${view===t[0]?' on':''}" data-act="view" data-v="${t[0]}"><div class="ic">${t[1]}</div><span>${t[2]}</span><small id="tp_${t[0]}"></small></button>`).join('');
   const v=$('view');
   if(view==='sum'){
-    v.innerHTML=S.cats.map(c=>`<div class="card sumrow" data-act="view" data-v="${c.id}">
+    v.innerHTML=quickHTML()+S.cats.map(c=>`<div class="card sumrow" data-act="view" data-v="${c.id}">
       <div class="ch"><h2>${c.e} ${c.n}</h2><span class="pct" id="sp_${c.id}"></span></div>
       <div class="meta" id="sm_${c.id}"></div><div class="bar"><i id="sb_${c.id}"></i></div></div>`).join('');
   }else{
     const c=S.cats.find(x=>x.id===view);
     v.innerHTML=`<div class="card"><div class="ch"><h2>${c.e} ${c.n}</h2><span class="pct" id="cp"></span></div>
-      <div class="lbl" id="cm"></div><div class="bar"><i id="cb"></i></div>
-      ${c.items.map(i=>`<div class="row">
-        <div class="rn">${edit?`<input value="${esc(i.n)}" data-i="${i.id}" data-f="n" aria-label="항목명">
-          <button class="b del" data-act="del" data-i="${i.id}">${arm===i.id?'한 번 더 누르면 삭제':'삭제'}</button>`
-          :`<span>${esc(i.n)}</span><span id="p_${i.id}"></span>`}</div>
-        <div class="in2">
-          <div><label for="t_${i.id}">목표 ($)</label><input id="t_${i.id}" type="number" inputmode="decimal" min="0" value="${i.t}" data-i="${i.id}" data-f="t"></div>
-          <div><label for="s_${i.id}">사용 ($)</label><input id="s_${i.id}" type="number" inputmode="decimal" min="0" placeholder="0" value="${i.s}" data-i="${i.id}" data-f="s"></div>
-        </div>
-        <div class="rk" id="k_${i.id}"></div><div class="bar"><i id="b_${i.id}"></i></div></div>`).join('')}
-      <div class="bar2"><button class="b acc" data-act="add">+ 항목 추가</button>
-        <button class="b" data-act="edit">${edit?'편집 완료':'항목명 편집·삭제'}</button></div></div>`;
+      <div class="lbl" id="cm"></div><div class="bar"><i id="cb"></i></div>${c.items.map(itemHTML).join('')}
+      <div class="bar2"><button class="b acc" data-act="addItem">+ 항목 추가</button>
+      <button class="b" data-act="edit">${edit?'편집 완료':'항목명 편집·삭제'}</button></div></div>`;
   }
   upd();
 }
-
 function upd(){
   S.rate=num($('rate').value);
   let TT=0,TS=0;
@@ -138,10 +187,11 @@ function upd(){
       setT('cm',`사용 ${usd(s)} (${krw(s)}) / 목표 ${usd(t)} (${krw(t)})`);
       bar($('cb'),p);
       c.items.forEach(i=>{
-        const it=num(i.t),is=num(i.s),ip=pc(is,it);
+        const it=num(i.t),is=used(i),ip=pc(is,it);
+        setT('u_'+i.id,`${fe(is)} (${krw(is)})`);
         setT('p_'+i.id,Math.round(ip)+'%',ip>100);
         const k=$('k_'+i.id);
-        if(k)k.innerHTML=`목표 ${krw(it)} · 사용 ${krw(is)}`+(it>0&&is>it?` · <span class="over">${usd(is-it)} 초과</span>`:'');
+        if(k)k.innerHTML=`목표 ${krw(it)}`+(it>0&&is>it?` · <span class="over">${usd(is-it)} 초과</span>`:'');
         bar($('b_'+i.id),ip);
       });
     }
@@ -152,32 +202,79 @@ function upd(){
   bar($('tB'),P);$('tB').className='';
   setT('tp_sum',Math.round(P)+'%');
 }
-
-const find=id=>{for(const c of S.cats){const i=c.items.find(x=>x.id===id);if(i)return [c,i]}return []};
-document.addEventListener('input',e=>{
-  const el=e.target;
-  if(el.id==='rate'){upd();save();return}
-  if(el.dataset.i){const [,i]=find(el.dataset.i);if(i){i[el.dataset.f]=el.value;upd();save()}}
-});
-document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-act]');if(!b)return;
-  const a=b.dataset.act;
-  if(a==='view'){view=b.dataset.v;edit=false;arm=null;render();window.scrollTo({top:0})}
+function hint(){
+  [['fa','fh'],['qa','qh']].forEach(([a,h])=>{
+    const A=$(a),H=$(h);if(!A||!H)return;
+    const v=num(A.value);
+    H.textContent=(S.cur==='₩'&&v>0&&S.rate>0)?`≈ $${r2(v/S.rate).toLocaleString('en-US')} (환율 ${S.rate}원 기준)`:'';
+  });
+}
+function act(a,b){
+  const d=b.dataset;
+  if(a==='view'){view=d.v;edit=false;arm=null;formId=null;editEn=null;render();window.scrollTo({top:0})}
   else if(a==='edit'){edit=!edit;arm=null;render()}
-  else if(a==='add'){
+  else if(a==='addItem'){
     const c=S.cats.find(x=>x.id===view),id='x'+Date.now();
-    c.items.push({id,n:'새 항목',t:0,s:''});edit=true;render();save();
+    c.items.push({id,n:'새 항목',t:0,en:[]});edit=true;render();save();
     const inp=document.querySelector(`input[data-i="${id}"][data-f="n"]`);if(inp){inp.focus();inp.select()}
   }
   else if(a==='del'){
-    const id=b.dataset.i;
-    if(arm===id){const c=S.cats.find(x=>x.id===view);c.items=c.items.filter(x=>x.id!==id);arm=null;render();save()}
-    else{arm=id;render();setTimeout(()=>{if(arm===id){arm=null;render()}},3000)}
+    if(arm===d.i){const c=S.cats.find(x=>x.id===view);c.items=c.items.filter(x=>x.id!==d.i);arm=null;render();save()}
+    else{const id=d.i;arm=id;render();setTimeout(()=>{if(arm===id){arm=null;render()}},3000)}
+  }
+  else if(a==='form'){
+    formId=formId===d.i?null:d.i;if(formId)lst.add(d.i);editEn=null;render();
+    if(formId)$('fa').focus();
+  }
+  else if(a==='list'){
+    if(lst.has(d.i)){lst.delete(d.i);if(formId===d.i)formId=null}else lst.add(d.i);
+    editEn=null;render();
+  }
+  else if(a==='cur'){
+    S.cur=d.c;save();
+    document.querySelectorAll('[data-act="cur"]').forEach(x=>x.classList.toggle('acc',x.dataset.c===S.cur));hint();
+  }
+  else if(a==='addEn'){
+    const [,i]=find(d.i),v=num($('fa').value);if(!i||v<=0){$('fa').focus();return}
+    i.en.push(ent(v,$('fm').value));render();save();$('fa').focus();
+  }
+  else if(a==='qadd'){
+    const [,i]=find(q.i),v=num($('qa').value);if(!i||v<=0){$('qa').focus();return}
+    const e=ent(v,$('qm').value);i.en.push(e);save();
+    $('qa').value='';$('qm').value='';hint();upd();
+    setT('qmsg',`✔ ${i.n}에 ${fe(e.a)} 추가됨`);$('qa').focus();
+  }
+  else if(a==='editEn'){editEn=d.e;render();$('ea').focus()}
+  else if(a==='cancelEn'){editEn=null;render()}
+  else if(a==='saveEn'){
+    const [,i]=find(d.i),x=i&&i.en.find(y=>y.id===d.e),v=num($('ea').value);
+    if(x&&v>0){x.a=r2(v);x.m=$('em').value.trim();x.w=null}
+    editEn=null;render();save();
+  }
+  else if(a==='delEn'){
+    if(arm===d.e){const [,i]=find(d.i);i.en=i.en.filter(y=>y.id!==d.e);arm=null;render();save()}
+    else{const id=d.e;arm=id;render();setTimeout(()=>{if(arm===id){arm=null;render()}},3000)}
   }
   else if(a==='reset'){
-    if(arm==='reset'){S.cats=mk();arm=null;edit=false;$('reset').textContent='기본값으로 되돌리기';render();save()}
-    else{arm='reset';b.textContent='한 번 더 누르면 모든 데이터 초기화';setTimeout(()=>{if(arm==='reset'){arm=null;b.textContent='기본값으로 되돌리기'}},3000)}
+    if(arm==='reset'){S.cats=mk();arm=null;edit=false;formId=null;render();save();b.textContent='기본값으로 되돌리기'}
+    else{arm='reset';b.textContent='한 번 더 누르면 지출 내역까지 모두 초기화';setTimeout(()=>{if(arm==='reset'){arm=null;b.textContent='기본값으로 되돌리기'}},3000)}
   }
+}
+document.addEventListener('input',e=>{
+  const el=e.target;
+  if(el.id==='rate'){upd();hint();save();return}
+  if(el.dataset.f){const [,i]=find(el.dataset.i);if(i){i[el.dataset.f]=el.value;upd();save()}return}
+  if(el.id==='fa'||el.id==='qa')hint();
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='qc'){q.c=e.target.value;q.i=null;render()}
+  else if(e.target.id==='qi')q.i=e.target.value;
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.dataset&&e.target.dataset.sub){e.preventDefault();act(e.target.dataset.sub,e.target)}
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(b)act(b.dataset.act,b);
 });
 $('rate').value=S.rate;
 render();
