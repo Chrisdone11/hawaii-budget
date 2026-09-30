@@ -40,9 +40,10 @@ input:focus,select:focus{outline:2px solid var(--acc);outline-offset:1px}
 .pct{font-weight:700}
 .row{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
 .rn{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;font-weight:600}
-.in2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;align-items:end}
+.in2{display:grid;grid-template-columns:1fr;gap:2px;margin-top:6px}
 .in2 label{font-size:12px;color:var(--sub);display:block}
-.used{font-weight:700;font-size:14px;padding:8px 0}
+.tg{display:flex;gap:8px;align-items:center}.tg input{flex:1}.tg .seg .b{padding:8px 10px}
+.used{font-weight:700;font-size:14px;padding:4px 0 2px}
 .rk{font-size:12px;color:var(--sub);margin-top:2px}
 .over{color:var(--bad)}
 button.b{font:inherit;font-size:13px;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
@@ -87,14 +88,14 @@ button.ic2{font:inherit;background:none;border:0;padding:4px 6px;cursor:pointer;
 
 <script>
 const DEF=[
- ['air','항공권','✈️',[['대한항공 왕복 (3인)',2419]]],
+ ['air','항공권','✈️',[['대한항공 왕복 (3인)',3386700,'₩']]],
  ['stay','숙박비','🏨',[['힐튼 하와이안 빌리지',1100],['콘도·에어비앤비',900],['리조트피·청소비·세금 등',143]]],
  ['trans','교통비','🚗',[['렌트비 (5일)',300],['주유비',70],['보험료',80],['주차·우버·기타',50]]],
  ['food','식비','🍽️',[['식당',700],['마트쇼핑',371]]],
  ['fun','레저','🏄',[['서핑 레슨',150],['쿠알로아 랜치',200],['폴리네시안 문화센터',180],['다이아몬드헤드·하나우마·진주만',60],['아쿠아리움·동물원',30],['핼러윈·파티',23]]],
  ['shop','쇼핑','🎁',[['기념품',167],['선물',200]]]
 ];
-const mk=()=>DEF.map(c=>({id:c[0],n:c[1],e:c[2],items:c[3].map((it,i)=>({id:c[0]+i,n:it[0],t:it[1],en:[]}))}));
+const mk=()=>DEF.map(c=>({id:c[0],n:c[1],e:c[2],items:c[3].map((it,i)=>({id:c[0]+i,n:it[0],t:it[1],tc:it[2]||'$',en:[]}))}));
 const KEY='hawaii-budget-v3';
 function load(){
   try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&r.cats)return r}catch(e){}
@@ -103,16 +104,30 @@ function load(){
     o.cur='$';return o}}catch(e){}
   return {rate:1400,cur:'$',cats:mk()};
 }
-let S=load(),view='sum',edit=false,arm=null,formId=null,editEn=null,lst=new Set(),q={c:null,i:null};
+function norm(o){o.cats.forEach(c=>c.items.forEach(i=>{if(!i.tc)i.tc='$';if(i.id==='air0'&&i.tc==='$'&&parseFloat(i.t)===2419){i.tc='₩';i.t=3386700}}));return o}
+let S=norm(load()),view='sum',edit=false,arm=null,formId=null,editEn=null,lst=new Set(),q={c:null,i:null};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const $=id=>document.getElementById(id);
-const num=v=>parseFloat(v)||0;
+const num=v=>parseFloat(String(v).replace(/,/g,''))||0;
+const fmtN=n=>(n===''||n==null)?'':Number(String(n).replace(/,/g,'')).toLocaleString('en-US',{maximumFractionDigits:2});
+function fmtInput(el){
+  const pos=el.selectionStart,raw=el.value;
+  const left=raw.slice(0,pos).replace(/[^0-9.]/g,'').length;
+  const v=raw.replace(/[^0-9.]/g,''),dot=v.indexOf('.');
+  let ip=dot<0?v:v.slice(0,dot);const dp=dot<0?'':'.'+v.slice(dot+1).replace(/\./g,'');
+  ip=ip.replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  const out=ip+dp;el.value=out;
+  let c=0,n=0;while(c<out.length&&n<left){if(/[0-9.]/.test(out[c]))n++;c++}
+  try{el.setSelectionRange(c,c)}catch(e){}
+}
 const r2=n=>Math.round(n*100)/100;
 const usd=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString('en-US');
 const fe=n=>'$'+r2(n).toLocaleString('en-US');
 const krw=n=>Math.round(n*S.rate).toLocaleString('ko-KR')+'원';
 const used=i=>i.en.reduce((a,x)=>a+x.a,0);
-const tot=c=>c.items.reduce((a,i)=>(a.t+=num(i.t),a.s+=used(i),a),{t:0,s:0});
+const tU=i=>i.tc==='₩'?num(i.t)/(S.rate||1400):num(i.t);
+const usedT=i=>i.tc==='₩'?i.en.reduce((a,x)=>a+(x.w!=null?x.w:x.a*(S.rate||1400)),0):used(i);
+const tot=c=>c.items.reduce((a,i)=>(a.t+=tU(i),a.s+=used(i),a),{t:0,s:0});
 const pc=(s,t)=>t>0?s/t*100:0;
 const cls=p=>p>100?'bad':p>80?'warn':'';
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -124,13 +139,13 @@ function ent(v,m){const rt=S.rate||1400;return {id:'e'+Date.now()+Math.random().
 const segHTML=()=>`<div class="seg"><button class="b${S.cur==='$'?' acc':''}" data-act="cur" data-c="$">$</button><button class="b${S.cur==='₩'?' acc':''}" data-act="cur" data-c="₩">원</button></div>`;
 
 function formHTML(id){return `<div class="fm">${segHTML()}
-  <input id="fa" type="number" inputmode="decimal" min="0" placeholder="금액" data-sub="addEn" data-i="${id}">
+  <input id="fa" class="nm" type="text" inputmode="decimal" placeholder="금액" data-sub="addEn" data-i="${id}">
   <input id="fm" class="full" placeholder="메모 (선택)" data-sub="addEn" data-i="${id}">
   <button class="b acc full" data-act="addEn" data-i="${id}">추가</button></div><div class="rk" id="fh"></div>`}
 function listHTML(i){
   if(!i.en.length)return '<div class="empty">아직 내역이 없어요</div>';
   return i.en.slice().reverse().map(x=>editEn===x.id
-   ?`<div class="en ed"><input id="ea" type="number" inputmode="decimal" value="${x.a}"><input id="em" value="${esc(x.m||'')}" placeholder="메모"><button class="b acc" data-act="saveEn" data-e="${x.id}" data-i="${i.id}">저장</button><button class="b" data-act="cancelEn">취소</button></div>`
+   ?`<div class="en ed"><input id="ea" class="nm" type="text" inputmode="decimal" value="${fmtN(x.a)}"><input id="em" value="${esc(x.m||'')}" placeholder="메모"><button class="b acc" data-act="saveEn" data-e="${x.id}" data-i="${i.id}">저장</button><button class="b" data-act="cancelEn">취소</button></div>`
    :`<div class="en"><span class="ed0">${x.d||''}</span><span>${esc(x.m||'')}${x.w?` <small>₩${x.w.toLocaleString('ko-KR')}</small>`:''}</span><b>${fe(x.a)}</b>
      <button class="ic2" data-act="editEn" data-e="${x.id}" aria-label="수정">✏️</button>
      <button class="ic2" data-act="delEn" data-e="${x.id}" data-i="${i.id}" aria-label="삭제">${arm===x.id?'삭제?':'🗑'}</button></div>`).join('');
@@ -140,7 +155,7 @@ function itemHTML(i){
   return `<div class="row"><div class="rn">${edit
     ?`<input value="${esc(i.n)}" data-i="${i.id}" data-f="n" aria-label="항목명"><button class="b del" data-act="del" data-i="${i.id}">${arm===i.id?'한 번 더 누르면 삭제':'삭제'}</button>`
     :`<span>${esc(i.n)}</span><span id="p_${i.id}"></span>`}</div>
-   <div class="in2"><div><label for="t_${i.id}">목표 ($)</label><input id="t_${i.id}" type="number" inputmode="decimal" min="0" value="${i.t}" data-i="${i.id}" data-f="t"></div>
+   <div class="in2"><div><label for="t_${i.id}">목표 (${i.tc==='₩'?'원':'$'})</label><div class="tg"><input id="t_${i.id}" class="nm" type="text" inputmode="decimal" value="${fmtN(i.t)}" data-i="${i.id}" data-f="t"><div class="seg"><button class="b${i.tc==='$'?' acc':''}" data-act="tcur" data-i="${i.id}" data-c="$">$</button><button class="b${i.tc==='₩'?' acc':''}" data-act="tcur" data-i="${i.id}" data-c="₩">원</button></div></div></div>
    <div><label>사용 (자동 합계)</label><div class="used" id="u_${i.id}"></div></div></div>
    <div class="rk" id="k_${i.id}"></div><div class="bar"><i id="b_${i.id}"></i></div>
    ${edit?'':`<div class="acts"><button class="b acc" data-act="form" data-i="${i.id}">+ 지출 추가</button><button class="b" data-act="list" data-i="${i.id}">내역 ${i.en.length}건 ${lo?'▴':'▾'}</button></div>${fo?formHTML(i.id):''}${lo?listHTML(i):''}`}</div>`;
@@ -152,7 +167,7 @@ function quickHTML(){
   return `<div class="card"><div class="ch"><h2>⚡ 빠른 지출 입력</h2></div>
    <div class="qs"><select id="qc" aria-label="분류">${S.cats.map(x=>`<option value="${x.id}"${x.id===q.c?' selected':''}>${x.e} ${x.n}</option>`).join('')}</select>
    <select id="qi" aria-label="항목">${c.items.map(x=>`<option value="${x.id}"${x.id===q.i?' selected':''}>${esc(x.n)}</option>`).join('')}</select></div>
-   <div class="fm">${segHTML()}<input id="qa" type="number" inputmode="decimal" min="0" placeholder="금액" data-sub="qadd">
+   <div class="fm">${segHTML()}<input id="qa" class="nm" type="text" inputmode="decimal" placeholder="금액" data-sub="qadd">
    <input id="qm" class="full" placeholder="메모 (선택)" data-sub="qadd"><button class="b acc full" data-act="qadd">추가</button></div>
    <div class="rk" id="qh"></div><div class="msg" id="qmsg"></div></div>`;
 }
@@ -187,11 +202,11 @@ function upd(){
       setT('cm',`사용 ${usd(s)} (${krw(s)}) / 목표 ${usd(t)} (${krw(t)})`);
       bar($('cb'),p);
       c.items.forEach(i=>{
-        const it=num(i.t),is=used(i),ip=pc(is,it);
-        setT('u_'+i.id,`${fe(is)} (${krw(is)})`);
+        const it=num(i.t),u=used(i),is=usedT(i),ip=pc(is,it),w=i.tc==='₩';
+        setT('u_'+i.id,`${fe(u)} (${krw(u)})`);
         setT('p_'+i.id,Math.round(ip)+'%',ip>100);
         const k=$('k_'+i.id);
-        if(k)k.innerHTML=`목표 ${krw(it)}`+(it>0&&is>it?` · <span class="over">${usd(is-it)} 초과</span>`:'');
+        if(k)k.innerHTML=(w?`목표 ${Math.round(it).toLocaleString('ko-KR')}원 (${fe(tU(i))})`:`목표 ${krw(it)}`)+(it>0&&is>it?` · <span class="over">${w?Math.round(is-it).toLocaleString('ko-KR')+'원':usd(is-it)} 초과</span>`:'');
         bar($('b_'+i.id),ip);
       });
     }
@@ -215,12 +230,16 @@ function act(a,b){
   else if(a==='edit'){edit=!edit;arm=null;render()}
   else if(a==='addItem'){
     const c=S.cats.find(x=>x.id===view),id='x'+Date.now();
-    c.items.push({id,n:'새 항목',t:0,en:[]});edit=true;render();save();
+    c.items.push({id,n:'새 항목',t:0,tc:'$',en:[]});edit=true;render();save();
     const inp=document.querySelector(`input[data-i="${id}"][data-f="n"]`);if(inp){inp.focus();inp.select()}
   }
   else if(a==='del'){
     if(arm===d.i){const c=S.cats.find(x=>x.id===view);c.items=c.items.filter(x=>x.id!==d.i);arm=null;render();save()}
     else{const id=d.i;arm=id;render();setTimeout(()=>{if(arm===id){arm=null;render()}},3000)}
+  }
+  else if(a==='tcur'){
+    const [,i]=find(d.i);
+    if(i&&i.tc!==d.c){const v=num(i.t),rt=S.rate||1400;i.t=d.c==='₩'?Math.round(v*rt):r2(v/rt);i.tc=d.c;render();save()}
   }
   else if(a==='form'){
     formId=formId===d.i?null:d.i;if(formId)lst.add(d.i);editEn=null;render();
@@ -262,8 +281,9 @@ function act(a,b){
 }
 document.addEventListener('input',e=>{
   const el=e.target;
+  if(el.classList.contains('nm'))fmtInput(el);
   if(el.id==='rate'){upd();hint();save();return}
-  if(el.dataset.f){const [,i]=find(el.dataset.i);if(i){i[el.dataset.f]=el.value;upd();save()}return}
+  if(el.dataset.f){const [,i]=find(el.dataset.i);if(i){i[el.dataset.f]=el.dataset.f==='t'?num(el.value):el.value;upd();save()}return}
   if(el.id==='fa'||el.id==='qa')hint();
 });
 document.addEventListener('change',e=>{
